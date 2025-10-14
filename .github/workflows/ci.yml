@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -7,24 +8,46 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up Rust
-        uses: actions/setup-rust@v1
+        uses: actions-rs/toolchain@v1
         with:
-          rust-version: stable
-
+          toolchain: stable
+          profile: minimal
+          override: true
       - name: Run tests
         run: cargo test --all --verbose
 
+  rust-analyzer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
       - name: Run rust-analyzer
         run: |
           cargo install --locked rust-analyzer || true
           rust-analyzer --version
 
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
       - name: Check formatting
         run: cargo fmt --all -- --check
