@@ -1,16 +1,4 @@
-  clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-      - name: Run clippy
-        run: cargo clippy --all -- -D warnings
+  
 
 name: CI
 
@@ -48,3 +36,17 @@ jobs:
           override: true
       - name: Check formatting
         run: cargo fmt --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - name: Run clippy
+        run: cargo clippy --all -- -D warnings
