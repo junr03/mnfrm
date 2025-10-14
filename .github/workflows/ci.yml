@@ -35,7 +35,8 @@ jobs:
           override: true
       - name: Install rust-analyzer
         run: |
-          curl -L https://github.com/rust-lang/rust-analyzer/releases/latest/download/rust-analyzer-linux -o rust-analyzer
+          RA_LATEST=$(curl -s https://api.github.com/repos/rust-lang/rust-analyzer/releases/latest | grep tag_name | cut -d '"' -f4)
+          curl -L "https://github.com/rust-lang/rust-analyzer/releases/download/${RA_LATEST}/rust-analyzer-linux" -o rust-analyzer
           chmod +x rust-analyzer
           ./rust-analyzer --version
 
