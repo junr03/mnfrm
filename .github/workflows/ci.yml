@@ -33,10 +33,11 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
-      - name: Run rust-analyzer
+      - name: Install rust-analyzer
         run: |
-          cargo install --locked rust-analyzer || true
-          rust-analyzer --version
+          curl -L https://github.com/rust-lang/rust-analyzer/releases/latest/download/rust-analyzer-linux -o rust-analyzer
+          chmod +x rust-analyzer
+          ./rust-analyzer --version
 
   fmt:
     runs-on: ubuntu-latest
