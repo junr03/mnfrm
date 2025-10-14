@@ -1,3 +1,16 @@
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - name: Run clippy
+        run: cargo clippy --all -- -D warnings
 
 name: CI
 
@@ -21,24 +34,6 @@ jobs:
           override: true
       - name: Run tests
         run: cargo test --all --verbose
-
-  rust-analyzer:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
-      - name: Install rust-analyzer
-        run: |
-          RA_LATEST=$(curl -s https://api.github.com/repos/rust-lang/rust-analyzer/releases/latest | grep tag_name | cut -d '"' -f4)
-          curl -L "https://github.com/rust-lang/rust-analyzer/releases/download/${RA_LATEST}/rust-analyzer-linux" -o rust-analyzer
-          chmod +x rust-analyzer
-          ./rust-analyzer --version
 
   fmt:
     runs-on: ubuntu-latest
