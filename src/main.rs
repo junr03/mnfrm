@@ -12,6 +12,8 @@ use std::hash::BuildHasher;
 use std::hash::BuildHasherDefault;
 use std::str::FromStr;
 use tracing::info;
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::registry;
 
 const REFRESH_RATE_DEFAULT: u64 = 130;
 const IMAGE_URL_TIMEOUT_DEFAULT: u64 = 0;
@@ -20,7 +22,9 @@ const SERVER_PORT_DEFAULT: u16 = 2443;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
+    let tracing_subscriber = registry::Registry::default()
+        .with(tracing_journald::layer().context("failed to create journald layer")?);
+    tracing::subscriber::set_global_default(tracing_subscriber).context("failed to set tracing")?;
 
     let app = Router::new()
         .route("/api/setup", get(setup))
