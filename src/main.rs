@@ -185,7 +185,25 @@ struct LogEntry {
 async fn log(Json(payload): Json<LogRequest>) -> Result<StatusCode, AppError> {
     info!("Received log request");
     for log_entry in payload.logs {
-        info!("Log Entry: {:?}", log_entry);
+        info!(
+            "Log Entry - id: {}, message: {}, wifi_status: {}, created_at: {}, sleep_duration: {}, refresh_rate: {}, free_heap_size: {}, max_alloc_size: {}, source_path: {}, wake_reason: {}, firmware_version: {}, retry: {}, battery_voltage: {}, source_line: {}, special_function: {}, wifi_signal: {}",
+            log_entry.id,
+            log_entry.message,
+            log_entry.wifi_status,
+            log_entry.created_at,
+            log_entry.sleep_duration,
+            log_entry.refresh_rate,
+            log_entry.free_heap_size,
+            log_entry.max_alloc_size,
+            log_entry.source_path,
+            log_entry.wake_reason,
+            log_entry.firmware_version,
+            log_entry.retry,
+            log_entry.battery_voltage,
+            log_entry.source_line,
+            log_entry.special_function,
+            log_entry.wifi_signal
+        );
     }
 
     Ok(StatusCode::NO_CONTENT)
