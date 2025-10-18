@@ -36,6 +36,8 @@ async fn main() -> Result<()> {
         .await
         .context("failed to start axum")?;
 
+    info!("Server started");
+
     Ok(())
 }
 
