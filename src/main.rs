@@ -11,6 +11,7 @@ use serde::Serialize;
 use std::hash::BuildHasher;
 use std::hash::BuildHasherDefault;
 use std::str::FromStr;
+use tracing::info;
 
 const REFRESH_RATE_DEFAULT: u64 = 130;
 const IMAGE_URL_TIMEOUT_DEFAULT: u64 = 0;
@@ -19,6 +20,8 @@ const SERVER_PORT_DEFAULT: u16 = 2443;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    tracing_subscriber::fmt::init();
+
     let app = Router::new()
         .route("/api/setup", get(setup))
         .route("/api/display", get(display))
@@ -33,10 +36,12 @@ async fn main() -> Result<()> {
         .await
         .context("failed to start axum")?;
 
+    info!("Server started");
+
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct SetupResponse {
     api_key: u64,
     friendly_id: String,
@@ -45,6 +50,8 @@ struct SetupResponse {
 }
 
 async fn setup(headers: HeaderMap) -> Result<(StatusCode, Json<SetupResponse>), AppError> {
+    info!("Received setup request");
+
     let device_mac_address = get_device_mac_address(&headers)?;
     let response = SetupResponse {
         api_key: generate_api_key(device_mac_address).context("failed to generate API key")?,
@@ -53,6 +60,8 @@ async fn setup(headers: HeaderMap) -> Result<(StatusCode, Json<SetupResponse>), 
         image_url: generate_image_url().context("failed to generate image URL")?,
         message: generate_message().context("failed to generate message")?,
     };
+
+    info!("Sending setup response: {:?}", response);
 
     Ok((StatusCode::OK, Json(response)))
 }
@@ -88,7 +97,7 @@ fn generate_message() -> anyhow::Result<String> {
     Ok("Welcome to MNFRM".to_string())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct DisplayResponse {
     filename: String,
     firmware_url: String,
@@ -113,6 +122,8 @@ struct DeviceFirmware {
 }
 
 async fn display(_: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse>), AppError> {
+    info!("Received display request");
+
     let device_firmware = DeviceFirmware {
         firmware_url: get_latest_firmware_url(),
         reset_firmware: false,
@@ -135,6 +146,8 @@ async fn display(_: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse>), Ap
         update_firmware: device_firmware.update_firmware,
     };
 
+    info!("Sending display response: {:?}", resp);
+
     // Implement your display logic here
     Ok((StatusCode::OK, Json(resp)))
 }
@@ -150,7 +163,7 @@ struct LogRequest {
     logs: Vec<LogEntry>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 struct LogEntry {
     id: u64,
     message: String,
@@ -171,23 +184,24 @@ struct LogEntry {
 }
 
 async fn log(Json(payload): Json<LogRequest>) -> Result<StatusCode, AppError> {
+    info!("Received log request");
     for log_entry in payload.logs {
-        println!(
-            "Log ID: {}, Message: {}, Created At: {}, WiFi Status: {}, Sleep Duration: {}, Refresh Rate: {}, Free Heap: {}, Max Alloc: {}, Source: {}:{}, Wake Reason: {}, Firmware: {}, Retry: {}, Battery: {}V, Special Function: {}, WiFi Signal: {}",
+        info!(
+            "Log Entry - id: {}, message: {}, wifi_status: {}, created_at: {}, sleep_duration: {}, refresh_rate: {}, free_heap_size: {}, max_alloc_size: {}, source_path: {}, wake_reason: {}, firmware_version: {}, retry: {}, battery_voltage: {}, source_line: {}, special_function: {}, wifi_signal: {}",
             log_entry.id,
             log_entry.message,
-            log_entry.created_at,
             log_entry.wifi_status,
+            log_entry.created_at,
             log_entry.sleep_duration,
             log_entry.refresh_rate,
             log_entry.free_heap_size,
             log_entry.max_alloc_size,
             log_entry.source_path,
-            log_entry.source_line,
             log_entry.wake_reason,
             log_entry.firmware_version,
             log_entry.retry,
             log_entry.battery_voltage,
+            log_entry.source_line,
             log_entry.special_function,
             log_entry.wifi_signal
         );
