@@ -12,6 +12,7 @@ use std::hash::BuildHasher;
 use std::hash::BuildHasherDefault;
 use std::str::FromStr;
 use tracing::info;
+use tracing::level_filters::LevelFilter;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::registry;
 
@@ -23,6 +24,7 @@ const SERVER_PORT_DEFAULT: u16 = 2443;
 #[tokio::main]
 async fn main() -> Result<()> {
     let tracing_subscriber = registry::Registry::default()
+        .with(LevelFilter::INFO)
         .with(tracing_journald::layer().context("failed to create journald layer")?);
     tracing::subscriber::set_global_default(tracing_subscriber).context("failed to set tracing")?;
 
