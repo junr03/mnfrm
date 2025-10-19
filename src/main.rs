@@ -12,9 +12,7 @@ use std::hash::BuildHasher;
 use std::hash::BuildHasherDefault;
 use std::str::FromStr;
 use tracing::info;
-use tracing::level_filters::LevelFilter;
 use tracing_subscriber::prelude::*;
-use tracing_subscriber::registry;
 
 const REFRESH_RATE_DEFAULT: u64 = 130;
 const IMAGE_URL_TIMEOUT_DEFAULT: u64 = 0;
@@ -23,10 +21,8 @@ const SERVER_PORT_DEFAULT: u16 = 2443;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let tracing_subscriber = registry::Registry::default()
-        .with(LevelFilter::INFO)
-        .with(tracing_journald::layer().context("failed to create journald layer")?);
-    tracing::subscriber::set_global_default(tracing_subscriber).context("failed to set tracing")?;
+    let journald = tracing_journald::layer().expect("journald subscriber");
+    tracing_subscriber::registry().with(journald).init();
 
     let app = Router::new()
         .route("/api/setup", get(setup))
@@ -43,7 +39,6 @@ async fn main() -> Result<()> {
         .context("failed to start axum")?;
 
     info!("Server started");
-    println!("Server listening on port {}", SERVER_PORT_DEFAULT);
 
     Ok(())
 }
