@@ -12,7 +12,7 @@ use std::hash::BuildHasher;
 use std::hash::BuildHasherDefault;
 use std::str::FromStr;
 use tracing::info;
-use tracing_subscriber::prelude::*;
+use tracing_subscriber::layer::SubscriberExt;
 
 const REFRESH_RATE_DEFAULT: u64 = 130;
 const IMAGE_URL_TIMEOUT_DEFAULT: u64 = 0;
@@ -21,8 +21,17 @@ const SERVER_PORT_DEFAULT: u16 = 2443;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let journald = tracing_journald::layer().expect("journald subscriber");
-    tracing_subscriber::registry().with(journald).init();
+    // A tag for the Fluentd log messages
+    let tag = "mnfrm.log";
+
+    let layer = tracing_fluentd::Builder::new(tag)
+        .flatten()
+        .layer()
+        .expect("Create layer");
+    let sub = tracing_subscriber::Registry::default().with(layer);
+    tracing::subscriber::set_global_default(sub).expect("failed to set default tracing subscriber");
+
+    tracing::info!("Tracing setup with Fluentd is complete!");
 
     let app = Router::new()
         .route("/api/setup", get(setup))
