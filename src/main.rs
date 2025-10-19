@@ -12,8 +12,6 @@ use std::hash::BuildHasher;
 use std::hash::BuildHasherDefault;
 use std::str::FromStr;
 use tracing::info;
-use tracing_fluentd::fluentd;
-use tracing_subscriber::prelude::*;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 const REFRESH_RATE_DEFAULT: u64 = 130;
@@ -26,20 +24,12 @@ async fn main() -> Result<()> {
     // A tag for the Fluentd log messages
     let tag = "mnfrm.log";
 
-    // Create a non-blocking writer for the Fluentd layer.
-    // This offloads the network I/O to a separate task,
-    // ensuring your application's performance is not degraded.
-    let (layer, _guard) = fluentd::Layer::builder(tag)
-        .connect("fluent-bit:24224")
-        .await
-        .expect("Failed to create Fluentd tracing layer");
-
-    // Combine the Fluentd layer with a format layer for console output,
-    // and filter based on the RUST_LOG environment variable.
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::from_default_env())
-        .with(layer)
-        .init();
+    let layer = tracing_fluentd::Builder::new(tag)
+        .flatten()
+        .layer()
+        .expect("Create layer");
+    let sub = tracing_subscriber::Registry::default().with(layer);
+    tracing::subscriber::set_global_default(sub).expect("failed to set default tracing subscriber");
 
     tracing::info!("Tracing setup with Fluentd is complete!");
 
