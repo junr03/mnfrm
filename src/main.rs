@@ -43,6 +43,7 @@ async fn main() -> Result<()> {
         .context("failed to start axum")?;
 
     info!("Server started");
+    println!("Server listening on port {}", SERVER_PORT_DEFAULT);
 
     Ok(())
 }
