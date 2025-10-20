@@ -8,10 +8,12 @@ use axum::{Json, Router};
 use macaddr::MacAddr;
 use rustc_hash::FxHasher;
 use serde::Serialize;
+use std::env;
 use std::hash::BuildHasher;
 use std::hash::BuildHasherDefault;
 use std::process;
 use std::str::FromStr;
+use tower_http::services::ServeDir;
 use tracing::info;
 use tracing_subscriber::prelude::*;
 use url::Url;
@@ -46,10 +48,13 @@ async fn main() -> Result<()> {
         "tracing successfully set up",
     );
 
+    let static_files = ServeDir::new("./assets");
+
     let app = Router::new()
         .route("/api/setup", get(setup))
         .route("/api/display", get(display))
         .route("/api/log", get(log))
+        .nest_service("/assets", static_files)
         .layer(tower_http::catch_panic::CatchPanicLayer::new());
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", SERVER_PORT_DEFAULT))
@@ -59,8 +64,6 @@ async fn main() -> Result<()> {
     axum::serve(listener, app)
         .await
         .context("failed to start axum")?;
-
-    info!("Server started");
 
     Ok(())
 }
@@ -74,18 +77,23 @@ struct SetupResponse {
 }
 
 async fn setup(headers: HeaderMap) -> Result<(StatusCode, Json<SetupResponse>), AppError> {
-    info!("Received setup request");
-
     let device_mac_address = get_device_mac_address(&headers)?;
+    let api_key = generate_api_key(device_mac_address)?;
+    let friendly_id = generate_friendly_id(device_mac_address)?;
+
+    info!(device_mac_address = %device_mac_address, device_api_key = %api_key, device_friendly_id = %friendly_id, "Received display request");
+
+    let image_url = generate_image_url().context("failed to generate image URL")?;
+    let message = generate_message().context("failed to generate message")?;
+
     let response = SetupResponse {
-        api_key: generate_api_key(device_mac_address).context("failed to generate API key")?,
-        friendly_id: generate_friendly_id(device_mac_address)
-            .context("failed to generate friendly ID")?,
-        image_url: generate_image_url().context("failed to generate image URL")?,
-        message: generate_message().context("failed to generate message")?,
+        api_key,
+        friendly_id,
+        image_url,
+        message,
     };
 
-    info!("Sending setup response: {:?}", response);
+    info!(response = ?response, "Sending setup response");
 
     Ok((StatusCode::OK, Json(response)))
 }
@@ -114,7 +122,11 @@ fn generate_friendly_id(device_mac_address: MacAddr) -> anyhow::Result<String> {
 }
 
 fn generate_image_url() -> anyhow::Result<String> {
-    Ok("https://localhost:2443/assets/welcome_screen.bmp".to_string())
+    Ok(format!(
+        "http://{}:{}/assets/welcome_screen.bmp",
+        env::var("MNFRM_URL").unwrap(),
+        env::var("MNFRM_PORT").unwrap_or_else(|_| SERVER_PORT_DEFAULT.to_string()),
+    ))
 }
 
 fn generate_message() -> anyhow::Result<String> {
@@ -145,8 +157,12 @@ struct DeviceFirmware {
     update_firmware: bool,
 }
 
-async fn display(_: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse>), AppError> {
-    info!("Received display request");
+async fn display(headers: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse>), AppError> {
+    let device_mac_address = get_device_mac_address(&headers)?;
+    let device_api_key = generate_api_key(device_mac_address)?;
+    let device_friendly_id = generate_friendly_id(device_mac_address)?;
+
+    info!(device_mac_address = %device_mac_address, device_api_key = %device_api_key, device_friendly_id = %device_friendly_id, "Received display request");
 
     let device_firmware = DeviceFirmware {
         firmware_url: get_latest_firmware_url(),
@@ -155,7 +171,11 @@ async fn display(_: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse>), Ap
     };
     let display_image = DisplayImage {
         filename: "welcome_screen.bmp".to_string(),
-        image_url: "https://localhost:2443/assets/screens/welcome_screen.bmp".to_string(),
+        image_url: format!(
+            "http://{}:{}/assets/screens/default_display.bmp",
+            env::var("MNFRM_URL").unwrap(),
+            env::var("MNFRM_PORT").unwrap_or_else(|_| SERVER_PORT_DEFAULT.to_string()),
+        ),
         image_url_timeout: IMAGE_URL_TIMEOUT_DEFAULT,
     };
 
@@ -170,7 +190,7 @@ async fn display(_: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse>), Ap
         update_firmware: device_firmware.update_firmware,
     };
 
-    info!("Sending display response: {:?}", resp);
+    info!(response = ?resp, "Sending display response");
 
     // Implement your display logic here
     Ok((StatusCode::OK, Json(resp)))
@@ -179,7 +199,11 @@ async fn display(_: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse>), Ap
 fn get_latest_firmware_url() -> String {
     // In a real implementation, this would query a database or configuration
     // to find the latest firmware URL for the device.
-    "https://localhost:2443/assets/firmware/latest.bin".to_string()
+    format!(
+        "http://{}:{}/assets/firmware/latest.bin",
+        env::var("MNFRM_URL").unwrap(),
+        env::var("MNFRM_PORT").unwrap_or_else(|_| SERVER_PORT_DEFAULT.to_string()),
+    )
 }
 
 #[derive(serde::Deserialize)]
@@ -188,6 +212,7 @@ struct LogRequest {
 }
 
 #[derive(serde::Deserialize, Debug)]
+#[allow(dead_code)]
 struct LogEntry {
     id: u64,
     message: String,
@@ -210,25 +235,7 @@ struct LogEntry {
 async fn log(Json(payload): Json<LogRequest>) -> Result<StatusCode, AppError> {
     info!("Received log request");
     for log_entry in payload.logs {
-        info!(
-            "Log Entry - id: {}, message: {}, wifi_status: {}, created_at: {}, sleep_duration: {}, refresh_rate: {}, free_heap_size: {}, max_alloc_size: {}, source_path: {}, wake_reason: {}, firmware_version: {}, retry: {}, battery_voltage: {}, source_line: {}, special_function: {}, wifi_signal: {}",
-            log_entry.id,
-            log_entry.message,
-            log_entry.wifi_status,
-            log_entry.created_at,
-            log_entry.sleep_duration,
-            log_entry.refresh_rate,
-            log_entry.free_heap_size,
-            log_entry.max_alloc_size,
-            log_entry.source_path,
-            log_entry.wake_reason,
-            log_entry.firmware_version,
-            log_entry.retry,
-            log_entry.battery_voltage,
-            log_entry.source_line,
-            log_entry.special_function,
-            log_entry.wifi_signal
-        );
+        info!(log_entry = ?log_entry, "Log entry");
     }
 
     Ok(StatusCode::NO_CONTENT)
