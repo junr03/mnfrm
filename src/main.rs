@@ -7,7 +7,7 @@ use axum::routing::get;
 use axum::{Json, Router};
 use base64::Engine;
 use base64::engine::general_purpose;
-use image::{ImageFormat, ImageReader};
+use image::ImageFormat;
 use macaddr::MacAddr;
 use rustc_hash::FxHasher;
 use serde::Serialize;
@@ -17,12 +17,12 @@ use std::hash::BuildHasher;
 use std::hash::BuildHasherDefault;
 use std::io::Cursor;
 use std::io::Read;
-use std::process;
+// ...existing code...
 use std::str::FromStr;
 use tower_http::services::ServeDir;
 use tracing::info;
-use tracing_subscriber::prelude::*;
-use url::Url;
+// ...existing code...
+// ...existing code...
 
 const REFRESH_RATE_DEFAULT: u64 = 130;
 const IMAGE_URL_TIMEOUT_DEFAULT: u64 = 0;
@@ -31,22 +31,25 @@ const SERVER_PORT_DEFAULT: u16 = 2443;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let (layer, task) = tracing_loki::builder()
-        .label("host", "mine")?
-        .label("service_name", "mnfrm")?
-        .extra_field("pid", format!("{}", process::id()))?
-        .build_url(Url::parse("http://loki:3100").unwrap())?;
+    // let (layer, task) = tracing_loki::builder()
+    //     .label("host", "mine")?
+    //     .label("service_name", "mnfrm")?
+    //     .extra_field("pid", format!("{}", process::id()))?
+    //     .build_url(Url::parse("http://loki:3100").unwrap())?;
 
-    // We need to register our layer with `tracing`.
-    tracing_subscriber::registry()
-        .with(layer)
-        // One could add more layers here, for example logging to stdout:
-        // .with(tracing_subscriber::fmt::Layer::new())
+    // // We need to register our layer with `tracing`.
+    // tracing_subscriber::registry()
+    //     .with(layer)
+    //     // One could add more layers here, for example logging to stdout:
+    //     // .with(tracing_subscriber::fmt::Layer::new())
+    //     .init();
+
+    // // The background task needs to be spawned so the logs actually get
+    // // delivered.
+    // tokio::spawn(task);
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
         .init();
-
-    // The background task needs to be spawned so the logs actually get
-    // delivered.
-    tokio::spawn(task);
 
     info!(
         task = "tracing_setup",
@@ -87,7 +90,7 @@ async fn setup(headers: HeaderMap) -> Result<(StatusCode, Json<SetupResponse>), 
     let api_key = generate_api_key(device_mac_address)?;
     let friendly_id = generate_friendly_id(device_mac_address)?;
 
-    info!(device_mac_address = %device_mac_address, device_api_key = %api_key, device_friendly_id = %friendly_id, "Received display request");
+    info!(device_mac_address = %device_mac_address, device_api_key = %api_key, device_friendly_id = %friendly_id, "Received setup request");
 
     let image_url = generate_image_url()
         .inspect_err(|e| tracing::error!(error = %e, "Failed to generate image URL"))
@@ -138,8 +141,22 @@ fn generate_image_url() -> anyhow::Result<String> {
         .context("failed to read bmp data")?;
 
     // 2. Decode the BMP data into a DynamicImage
-    let img = ImageReader::new(Cursor::new(bmp_data))
-        .decode()
+    // Some versions of the `image` crate don't expose `with_format` on
+    // `ImageReader` for certain cursor types; use `load_from_memory_with_format`
+    // which accepts a slice and an explicit format.
+    let header_hex = bmp_data.get(0..16).map(|b| {
+        let mut s = String::with_capacity(b.len() * 2);
+        for byte in b.iter() {
+            use std::fmt::Write as _;
+            write!(&mut s, "{:02x}", byte).ok();
+        }
+        s
+    });
+    tracing::debug!(header = ?header_hex, "decoding BMP with explicit format");
+    let img = image::load_from_memory_with_format(&bmp_data, ImageFormat::Bmp)
+        .inspect_err(
+            |e| tracing::error!(error = %e, header = ?header_hex, "ImageError decoding BMP"),
+        )
         .context("failed to decode BMP data")?;
 
     // 3. (Optional but recommended for web) Convert to PNG bytes
