@@ -25,9 +25,10 @@ async fn main() -> Result<()> {
     let tag = "mnfrm.log";
 
     let layer = tracing_fluentd::Builder::new(tag)
-        .flatten()
+        .with_writer("http://loki:3100")
         .layer()
-        .expect("Create layer");
+        .expect("Created tracing layer");
+
     let sub = tracing_subscriber::Registry::default().with(layer);
     tracing::subscriber::set_global_default(sub).expect("failed to set default tracing subscriber");
 
