@@ -130,6 +130,11 @@ fn generate_friendly_id(device_mac_address: MacAddr) -> anyhow::Result<String> {
 }
 
 fn generate_image_url() -> anyhow::Result<String> {
+    Ok("http://168.192.68.94:9878/assets/screens/output_resized.png".to_string())
+}
+
+#[allow(dead_code)]
+fn generate_image_url_base64() -> anyhow::Result<String> {
     // 1. Read the BMP file into a byte vector
     let mut file =
         File::open("../assets/screens/default_display.bmp").context("failed to open BMP file")?;
