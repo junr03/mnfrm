@@ -129,18 +129,23 @@ fn generate_friendly_id(device_mac_address: MacAddr) -> anyhow::Result<String> {
 
 fn generate_image_url() -> anyhow::Result<String> {
     // 1. Read the BMP file into a byte vector
-    let mut file = File::open("/assets/screens/default_display.bmp")?;
+    let mut file =
+        File::open("/assets/screens/default_display.bmp").context("failed to open BMP file")?;
     let mut bmp_data = Vec::new();
-    file.read_to_end(&mut bmp_data)?;
+    file.read_to_end(&mut bmp_data)
+        .context("failed to read bmp data")?;
 
     // 2. Decode the BMP data into a DynamicImage
-    let img = ImageReader::new(Cursor::new(bmp_data)).decode()?;
+    let img = ImageReader::new(Cursor::new(bmp_data))
+        .decode()
+        .context("failed to decode BMP data")?;
 
     // 3. (Optional but recommended for web) Convert to PNG bytes
     //    Directly encoding raw BMP bytes might not be what you want for
     //    embedding in HTML, as browsers expect a data URI with a specific image type.
     let mut png_bytes = Vec::new();
-    img.write_to(&mut Cursor::new(&mut png_bytes), ImageFormat::Png)?;
+    img.write_to(&mut Cursor::new(&mut png_bytes), ImageFormat::Png)
+        .context("failed to encode into PNG")?;
 
     // 4. Base64 encode the PNG bytes
     let encoded_base64 = general_purpose::STANDARD.encode(&png_bytes);
