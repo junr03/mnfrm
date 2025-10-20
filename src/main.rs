@@ -215,7 +215,7 @@ async fn display(headers: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse
         update_firmware: false,
     };
     let display_image = DisplayImage {
-        filename: "default_display.bmp".to_string(),
+        filename: "output_resized.png".to_string(),
         image_url: generate_image_url().context("failed to generate image URL")?,
         image_url_timeout: IMAGE_URL_TIMEOUT_DEFAULT,
     };
