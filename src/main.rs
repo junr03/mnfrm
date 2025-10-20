@@ -17,12 +17,12 @@ use std::hash::BuildHasher;
 use std::hash::BuildHasherDefault;
 use std::io::Cursor;
 use std::io::Read;
-// ...existing code...
+use std::process;
 use std::str::FromStr;
 use tower_http::services::ServeDir;
 use tracing::info;
-// ...existing code...
-// ...existing code...
+use tracing_subscriber::prelude::*;
+use url::Url;
 
 const REFRESH_RATE_DEFAULT: u64 = 130;
 const IMAGE_URL_TIMEOUT_DEFAULT: u64 = 0;
