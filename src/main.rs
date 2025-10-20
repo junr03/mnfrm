@@ -171,11 +171,7 @@ async fn display(headers: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse
     };
     let display_image = DisplayImage {
         filename: "default_display.bmp".to_string(),
-        image_url: format!(
-            "http://{}:{}/assets/screens/default_display.bmp",
-            env::var("MNFRM_URL").unwrap(),
-            env::var("MNFRM_PORT").unwrap_or_else(|_| SERVER_PORT_DEFAULT.to_string()),
-        ),
+        image_url: "http://192.168.68.94:9878/assets/screens/default_display.bmp".to_string(),
         image_url_timeout: IMAGE_URL_TIMEOUT_DEFAULT,
     };
 
