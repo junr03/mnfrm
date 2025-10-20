@@ -170,7 +170,7 @@ async fn display(headers: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse
         update_firmware: false,
     };
     let display_image = DisplayImage {
-        filename: "welcome_screen.bmp".to_string(),
+        filename: "default_display.bmp".to_string(),
         image_url: format!(
             "http://{}:{}/assets/screens/default_display.bmp",
             env::var("MNFRM_URL").unwrap(),
