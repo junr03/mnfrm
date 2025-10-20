@@ -5,12 +5,18 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Json, Router};
+use base64::Engine;
+use base64::engine::general_purpose;
+use image::{ImageFormat, ImageReader};
 use macaddr::MacAddr;
 use rustc_hash::FxHasher;
 use serde::Serialize;
 use std::env;
+use std::fs::File;
 use std::hash::BuildHasher;
 use std::hash::BuildHasherDefault;
+use std::io::Cursor;
+use std::io::Read;
 use std::process;
 use std::str::FromStr;
 use tower_http::services::ServeDir;
@@ -122,11 +128,24 @@ fn generate_friendly_id(device_mac_address: MacAddr) -> anyhow::Result<String> {
 }
 
 fn generate_image_url() -> anyhow::Result<String> {
-    Ok(format!(
-        "http://{}:{}/assets/welcome_screen.bmp",
-        env::var("MNFRM_URL").unwrap(),
-        env::var("MNFRM_PORT").unwrap_or_else(|_| SERVER_PORT_DEFAULT.to_string()),
-    ))
+    // 1. Read the BMP file into a byte vector
+    let mut file = File::open("/assets/screens/default_display.bmp")?;
+    let mut bmp_data = Vec::new();
+    file.read_to_end(&mut bmp_data)?;
+
+    // 2. Decode the BMP data into a DynamicImage
+    let img = ImageReader::new(Cursor::new(bmp_data)).decode()?;
+
+    // 3. (Optional but recommended for web) Convert to PNG bytes
+    //    Directly encoding raw BMP bytes might not be what you want for
+    //    embedding in HTML, as browsers expect a data URI with a specific image type.
+    let mut png_bytes = Vec::new();
+    img.write_to(&mut Cursor::new(&mut png_bytes), ImageFormat::Png)?;
+
+    // 4. Base64 encode the PNG bytes
+    let encoded_base64 = general_purpose::STANDARD.encode(&png_bytes);
+
+    Ok(format!("data:image/png;base64,{}", encoded_base64))
 }
 
 fn generate_message() -> anyhow::Result<String> {
@@ -171,7 +190,7 @@ async fn display(headers: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse
     };
     let display_image = DisplayImage {
         filename: "default_display.bmp".to_string(),
-        image_url: "http://192.168.68.94:9878/assets/screens/default_display.bmp".to_string(),
+        image_url: generate_image_url().context("failed to generate image URL")?,
         image_url_timeout: IMAGE_URL_TIMEOUT_DEFAULT,
     };
 
