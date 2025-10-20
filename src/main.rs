@@ -89,7 +89,9 @@ async fn setup(headers: HeaderMap) -> Result<(StatusCode, Json<SetupResponse>), 
 
     info!(device_mac_address = %device_mac_address, device_api_key = %api_key, device_friendly_id = %friendly_id, "Received display request");
 
-    let image_url = generate_image_url().context("failed to generate image URL")?;
+    let image_url = generate_image_url()
+        .inspect_err(|e| tracing::error!(error = %e, "Failed to generate image URL"))
+        .context("failed to generate image URL")?;
     let message = generate_message().context("failed to generate message")?;
 
     let response = SetupResponse {
@@ -130,7 +132,7 @@ fn generate_friendly_id(device_mac_address: MacAddr) -> anyhow::Result<String> {
 fn generate_image_url() -> anyhow::Result<String> {
     // 1. Read the BMP file into a byte vector
     let mut file =
-        File::open("/assets/screens/default_display.bmp").context("failed to open BMP file")?;
+        File::open("../assets/screens/default_display.bmp").context("failed to open BMP file")?;
     let mut bmp_data = Vec::new();
     file.read_to_end(&mut bmp_data)
         .context("failed to read bmp data")?;
