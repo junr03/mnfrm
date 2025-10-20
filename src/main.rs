@@ -129,7 +129,7 @@ fn generate_friendly_id(device_mac_address: MacAddr) -> anyhow::Result<String> {
 
 fn generate_image_url() -> anyhow::Result<String> {
     // 1. Read the BMP file into a byte vector
-    let mut file = File::open("/assets/default_display.bmp")?;
+    let mut file = File::open("/assets/screens/default_display.bmp")?;
     let mut bmp_data = Vec::new();
     file.read_to_end(&mut bmp_data)?;
 
