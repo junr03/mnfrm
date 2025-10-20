@@ -31,25 +31,22 @@ const SERVER_PORT_DEFAULT: u16 = 2443;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // let (layer, task) = tracing_loki::builder()
-    //     .label("host", "mine")?
-    //     .label("service_name", "mnfrm")?
-    //     .extra_field("pid", format!("{}", process::id()))?
-    //     .build_url(Url::parse("http://loki:3100").unwrap())?;
+    let (layer, task) = tracing_loki::builder()
+        .label("host", "mine")?
+        .label("service_name", "mnfrm")?
+        .extra_field("pid", format!("{}", process::id()))?
+        .build_url(Url::parse("http://loki:3100").unwrap())?;
 
-    // // We need to register our layer with `tracing`.
-    // tracing_subscriber::registry()
-    //     .with(layer)
-    //     // One could add more layers here, for example logging to stdout:
-    //     // .with(tracing_subscriber::fmt::Layer::new())
-    //     .init();
-
-    // // The background task needs to be spawned so the logs actually get
-    // // delivered.
-    // tokio::spawn(task);
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+    // We need to register our layer with `tracing`.
+    tracing_subscriber::registry()
+        .with(layer)
+        // One could add more layers here, for example logging to stdout:
+        // .with(tracing_subscriber::fmt::Layer::new())
         .init();
+
+    // The background task needs to be spawned so the logs actually get
+    // delivered.
+    tokio::spawn(task);
 
     info!(
         task = "tracing_setup",
