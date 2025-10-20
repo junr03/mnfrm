@@ -10,9 +10,11 @@ use rustc_hash::FxHasher;
 use serde::Serialize;
 use std::hash::BuildHasher;
 use std::hash::BuildHasherDefault;
+use std::process;
 use std::str::FromStr;
 use tracing::info;
-use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::prelude::*;
+use url::Url;
 
 const REFRESH_RATE_DEFAULT: u64 = 130;
 const IMAGE_URL_TIMEOUT_DEFAULT: u64 = 0;
@@ -21,18 +23,28 @@ const SERVER_PORT_DEFAULT: u16 = 2443;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // A tag for the Fluentd log messages
-    let tag = "mnfrm.log";
+    let (layer, task) = tracing_loki::builder()
+        .label("host", "mine")?
+        .label("service_name", "mnfrm")?
+        .extra_field("pid", format!("{}", process::id()))?
+        .build_url(Url::parse("http://loki:3100").unwrap())?;
 
-    let layer = tracing_fluentd::Builder::new(tag)
-        .with_writer("http://loki:3100")
-        .layer()
-        .expect("Created tracing layer");
+    // We need to register our layer with `tracing`.
+    tracing_subscriber::registry()
+        .with(layer)
+        // One could add more layers here, for example logging to stdout:
+        // .with(tracing_subscriber::fmt::Layer::new())
+        .init();
 
-    let sub = tracing_subscriber::Registry::default().with(layer);
-    tracing::subscriber::set_global_default(sub).expect("failed to set default tracing subscriber");
+    // The background task needs to be spawned so the logs actually get
+    // delivered.
+    tokio::spawn(task);
 
-    tracing::info!("Tracing setup with Fluentd is complete!");
+    info!(
+        task = "tracing_setup",
+        result = "success",
+        "tracing successfully set up",
+    );
 
     let app = Router::new()
         .route("/api/setup", get(setup))
