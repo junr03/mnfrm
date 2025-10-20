@@ -26,7 +26,7 @@ use url::Url;
 
 const REFRESH_RATE_DEFAULT: u64 = 130;
 const IMAGE_URL_TIMEOUT_DEFAULT: u64 = 0;
-static SPECIAL_FUNCTION_DEFAULT: &str = "sleep";
+static SPECIAL_FUNCTION_DEFAULT: &str = "none";
 const SERVER_PORT_DEFAULT: u16 = 2443;
 
 #[tokio::main]
