@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
         "tracing successfully set up",
     );
 
-    let static_files = ServeDir::new("./assets");
+    let static_files = ServeDir::new("/assets");
 
     let app = Router::new()
         .route("/api/setup", get(setup))
