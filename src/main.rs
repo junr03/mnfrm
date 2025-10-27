@@ -20,6 +20,7 @@ use std::io::Read;
 use std::process;
 use std::str::FromStr;
 use tower_http::services::ServeDir;
+use tower_http::trace::TraceLayer;
 use tracing::info;
 use tracing_subscriber::prelude::*;
 use url::Url;
@@ -59,6 +60,7 @@ async fn main() -> Result<()> {
     };
 
     let app = Router::new()
+        .layer(TraceLayer::new_for_http())
         .route("/api/setup", get(setup))
         .route("/api/display", get(display))
         .route("/api/log", get(log))
