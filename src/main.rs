@@ -130,7 +130,7 @@ fn generate_friendly_id(device_mac_address: MacAddr) -> anyhow::Result<String> {
 }
 
 fn generate_image_url() -> anyhow::Result<String> {
-    Ok("http://168.192.68.94:9878/assets/screens/output_resized.png".to_string())
+    Ok("http://192.168.68.94:9878/assets/screens/output_resized.png".to_string())
 }
 
 #[allow(dead_code)]
