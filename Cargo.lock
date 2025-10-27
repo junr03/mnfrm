@@ -1031,6 +1031,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tower-http",
+ "tower-service",
  "tracing",
  "tracing-loki",
  "tracing-subscriber",

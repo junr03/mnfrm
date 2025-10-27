@@ -54,7 +54,9 @@ async fn main() -> Result<()> {
         "tracing successfully set up",
     );
 
-    let static_files = ServeDir::new("/assets");
+    let static_files = InstrumentedServeDir {
+        serve_dir: ServeDir::new("/assets"),
+    };
 
     let app = Router::new()
         .route("/api/setup", get(setup))
@@ -72,6 +74,34 @@ async fn main() -> Result<()> {
         .context("failed to start axum")?;
 
     Ok(())
+}
+
+#[derive(Clone)]
+struct InstrumentedServeDir {
+    serve_dir: ServeDir,
+}
+
+impl tower_service::Service<axum::http::Request<axum::body::Body>> for InstrumentedServeDir {
+    type Response =
+        <ServeDir as tower_service::Service<axum::http::Request<axum::body::Body>>>::Response;
+    type Error = <ServeDir as tower_service::Service<axum::http::Request<axum::body::Body>>>::Error;
+    type Future =
+        <ServeDir as tower_service::Service<axum::http::Request<axum::body::Body>>>::Future;
+
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        <ServeDir as tower_service::Service<axum::http::Request<axum::body::Body>>>::poll_ready(
+            &mut self.serve_dir,
+            cx,
+        )
+    }
+
+    fn call(&mut self, req: axum::http::Request<axum::body::Body>) -> Self::Future {
+        info!("Serving static file request: {}", req.uri().path());
+        self.serve_dir.call(req)
+    }
 }
 
 #[derive(Serialize, Debug)]
