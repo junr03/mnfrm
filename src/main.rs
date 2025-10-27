@@ -1,12 +1,14 @@
 use anyhow::Context;
 use anyhow::Result;
-use axum::http::HeaderMap;
+use axum::body::Body;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Json, Router};
 use base64::Engine;
 use base64::engine::general_purpose;
+use bytes::Bytes;
+use http::{HeaderMap, Request, Response};
 use image::ImageFormat;
 use macaddr::MacAddr;
 use rustc_hash::FxHasher;
@@ -19,8 +21,10 @@ use std::io::Cursor;
 use std::io::Read;
 use std::process;
 use std::str::FromStr;
+use std::time::Duration;
 use tower_http::services::ServeDir;
-use tower_http::trace::TraceLayer;
+use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
+use tracing::Span;
 use tracing::info;
 use tracing_subscriber::prelude::*;
 use url::Url;
@@ -32,6 +36,57 @@ const SERVER_PORT_DEFAULT: u16 = 2443;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    setup_tracing()?;
+
+    let static_files = ServeDir::new("/assets");
+
+    let app = Router::new()
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(|_: &Request<Body>| tracing::info_span!("http-request"))
+                .on_request(|request: &Request<Body>, _span: &Span| {
+                    info!("started {} {}", request.method(), request.uri().path())
+                })
+                .on_response(
+                    |response: &Response<Body>, _latency: Duration, _span: &Span| {
+                        info!(status_code = %response.status(), "response generated");
+                    },
+                )
+                .on_body_chunk(|chunk: &Bytes, _latency: Duration, _span: &Span| {
+                    tracing::info!("sending {} bytes", chunk.len())
+                })
+                .on_eos(
+                    |_trailers: Option<&HeaderMap>, stream_duration: Duration, _span: &Span| {
+                        tracing::debug!("stream closed after {:?}", stream_duration)
+                    },
+                )
+                .on_failure(
+                    |error: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
+                        info!(
+                            error = %error,
+                            latency = ?latency,
+                            "request failed with server error",
+                        );
+                    },
+                ),
+        )
+        .route("/api/setup", get(setup))
+        .route("/api/display", get(display))
+        .route("/api/log", get(log))
+        .nest_service("/assets", static_files);
+
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", SERVER_PORT_DEFAULT))
+        .await
+        .context("failed to bind TCP listener")?;
+
+    axum::serve(listener, app)
+        .await
+        .context("failed to start axum")?;
+
+    Ok(())
+}
+
+fn setup_tracing() -> Result<()> {
     let (layer, task) = tracing_loki::builder()
         .label("host", "mine")?
         .label("service_name", "mnfrm")?
@@ -55,55 +110,7 @@ async fn main() -> Result<()> {
         "tracing successfully set up",
     );
 
-    let static_files = InstrumentedServeDir {
-        serve_dir: ServeDir::new("/assets"),
-    };
-
-    let app = Router::new()
-        .layer(TraceLayer::new_for_http())
-        .route("/api/setup", get(setup))
-        .route("/api/display", get(display))
-        .route("/api/log", get(log))
-        .nest_service("/assets", static_files)
-        .layer(tower_http::catch_panic::CatchPanicLayer::new());
-
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", SERVER_PORT_DEFAULT))
-        .await
-        .context("failed to bind TCP listener")?;
-
-    axum::serve(listener, app)
-        .await
-        .context("failed to start axum")?;
-
     Ok(())
-}
-
-#[derive(Clone)]
-struct InstrumentedServeDir {
-    serve_dir: ServeDir,
-}
-
-impl tower_service::Service<axum::http::Request<axum::body::Body>> for InstrumentedServeDir {
-    type Response =
-        <ServeDir as tower_service::Service<axum::http::Request<axum::body::Body>>>::Response;
-    type Error = <ServeDir as tower_service::Service<axum::http::Request<axum::body::Body>>>::Error;
-    type Future =
-        <ServeDir as tower_service::Service<axum::http::Request<axum::body::Body>>>::Future;
-
-    fn poll_ready(
-        &mut self,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
-        <ServeDir as tower_service::Service<axum::http::Request<axum::body::Body>>>::poll_ready(
-            &mut self.serve_dir,
-            cx,
-        )
-    }
-
-    fn call(&mut self, req: axum::http::Request<axum::body::Body>) -> Self::Future {
-        info!("Serving static file request: {}", req.uri().path());
-        self.serve_dir.call(req)
-    }
 }
 
 #[derive(Serialize, Debug)]
@@ -114,7 +121,9 @@ struct SetupResponse {
     message: String,
 }
 
-async fn setup(headers: HeaderMap) -> Result<(StatusCode, Json<SetupResponse>), AppError> {
+async fn setup(
+    headers: axum::http::HeaderMap,
+) -> Result<(StatusCode, Json<SetupResponse>), AppError> {
     let device_mac_address = get_device_mac_address(&headers)?;
     let api_key = generate_api_key(device_mac_address)?;
     let friendly_id = generate_friendly_id(device_mac_address)?;
