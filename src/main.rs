@@ -73,8 +73,7 @@ async fn main() -> Result<()> {
         .route("/api/setup", get(setup))
         .route("/api/display", get(display))
         .route("/api/log", get(log))
-        .nest_service("/assets", static_files)
-        .layer(tower_http::catch_panic::CatchPanicLayer::new());
+        .nest_service("/assets", static_files);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", SERVER_PORT_DEFAULT))
         .await
