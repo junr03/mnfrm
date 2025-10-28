@@ -1,14 +1,14 @@
 use anyhow::Context;
 use anyhow::Result;
 use axum::body::Body;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use base64::Engine;
 use base64::engine::general_purpose;
 use bytes::Bytes;
-use http::{HeaderMap, Request, Response};
+use http::{Request, Response};
 use image::ImageFormat;
 use macaddr::MacAddr;
 use rustc_hash::FxHasher;
@@ -243,7 +243,7 @@ struct DeviceFirmware {
     update_firmware: bool,
 }
 
-async fn display(headers: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse>), AppError> {
+async fn display(headers: HeaderMap) -> Result<(HeaderMap, Json<DisplayResponse>), AppError> {
     let device_mac_address = get_device_mac_address(&headers)?;
     let device_api_key = generate_api_key(device_mac_address)?;
     let device_friendly_id = generate_friendly_id(device_mac_address)?;
@@ -274,8 +274,11 @@ async fn display(headers: HeaderMap) -> Result<(StatusCode, Json<DisplayResponse
 
     info!(response = ?resp, "Sending display response");
 
+    let mut headers = HeaderMap::new();
+    headers.insert("Content-Type", HeaderValue::from_static("image/png"));
+
     // Implement your display logic here
-    Ok((StatusCode::OK, Json(resp)))
+    Ok((headers, Json(resp)))
 }
 
 fn get_latest_firmware_url() -> String {
