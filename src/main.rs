@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
                 })
                 .on_response(
                     |response: &Response<Body>, _latency: Duration, _span: &Span| {
-                        info!(status_code = %response.status(), "response generated");
+                        info!(status_code = %response.status(), headers = ?response.headers(), "response generated");
                     },
                 )
                 .on_body_chunk(|chunk: &Bytes, _latency: Duration, _span: &Span| {
