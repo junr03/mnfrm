@@ -3,7 +3,7 @@ use anyhow::Result;
 use axum::body::Body;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use base64::Engine;
 use base64::engine::general_purpose;
@@ -41,6 +41,10 @@ async fn main() -> Result<()> {
     let static_files = ServeDir::new("/assets");
 
     let app = Router::new()
+        .route("/api/setup/", get(setup))
+        .route("/api/display", get(display))
+        .route("/api/log", post(log))
+        .nest_service("/assets", static_files)
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(|_: &Request<Body>| tracing::info_span!("http-request"))
@@ -66,39 +70,6 @@ async fn main() -> Result<()> {
                             error = %error,
                             latency = ?latency,
                             "request failed with server error",
-                        );
-                    },
-                ),
-        )
-        .route("/api/setup/", get(setup))
-        .route("/api/display", get(display))
-        .route("/api/log", get(log))
-        .nest_service("/assets", static_files)
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(|_: &Request<Body>| tracing::info_span!("http-request"))
-                .on_request(|request: &Request<Body>, _span: &Span| {
-                    info!("2 started {} {}", request.method(), request.uri().path())
-                })
-                .on_response(
-                    |response: &Response<Body>, _latency: Duration, _span: &Span| {
-                        info!(status_code = %response.status(), "2 response generated");
-                    },
-                )
-                .on_body_chunk(|chunk: &Bytes, _latency: Duration, _span: &Span| {
-                    tracing::info!("2 sending {} bytes", chunk.len())
-                })
-                .on_eos(
-                    |_trailers: Option<&HeaderMap>, stream_duration: Duration, _span: &Span| {
-                        tracing::debug!("2 stream closed after {:?}", stream_duration)
-                    },
-                )
-                .on_failure(
-                    |error: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
-                        info!(
-                            error = %error,
-                            latency = ?latency,
-                            "2 request failed with server error",
                         );
                     },
                 ),
