@@ -296,22 +296,22 @@ struct LogRequest {
 #[derive(serde::Deserialize, Debug)]
 #[allow(dead_code)]
 struct LogEntry {
-    id: u64,
-    message: String,
-    wifi_status: String,
-    created_at: u64,
-    sleep_duration: u64,
-    refresh_rate: u64,
-    free_heap_size: u64,
-    max_alloc_size: u64,
-    source_path: String,
-    wake_reason: String,
-    firmware_version: String,
-    retry: u64,
-    battery_voltage: f64,
-    source_line: u64,
-    special_function: String,
-    wifi_signal: i64,
+    id: Option<u64>,
+    message: Option<String>,
+    wifi_status: Option<String>,
+    created_at: Option<u64>,
+    sleep_duration: Option<u64>,
+    refresh_rate: Option<u64>,
+    free_heap_size: Option<u64>,
+    max_alloc_size: Option<u64>,
+    source_path: Option<String>,
+    wake_reason: Option<String>,
+    firmware_version: Option<String>,
+    retry: Option<u64>,
+    battery_voltage: Option<f64>,
+    source_line: Option<u64>,
+    special_function: Option<String>,
+    wifi_signal: Option<i64>,
 }
 
 async fn log(Json(payload): Json<LogRequest>) -> Result<StatusCode, AppError> {
